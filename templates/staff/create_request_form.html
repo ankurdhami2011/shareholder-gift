@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% block title %}Create Request Form{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Create Request Form</h2>
+    <a href="{% url 'staff-web-create-request-search' %}" class="btn btn-secondary">Back</a>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header">Selected Share Details</div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Share No:</strong> {{ share.share_number }}</p>
+                <p><strong>Folio:</strong> {{ share.shareholder.shareholder_code }}</p>
+                <p><strong>Shareholder:</strong> {{ share.shareholder.shareholder_name }}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Mobile:</strong> {{ share.shareholder.mobile_number }}</p>
+                <p><strong>Branch:</strong> {{ share.branch.branch_name }}</p>
+                <p><strong>Status:</strong> {{ share.gift_status }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header">Request Details</div>
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Mobile Number</label>
+                    <input type="text" name="mobile_number" class="form-control"
+                           value="{{ share.shareholder.mobile_number }}" required>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Customer Type</label>
+                    <select name="customer_type" class="form-control">
+                        <option value="KEYPAD_PHONE">KEYPAD_PHONE</option>
+                        <option value="WALKIN">WALKIN</option>
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Recipient Name</label>
+                    <input type="text" name="recipient_name" class="form-control"
+                           value="{{ share.shareholder.shareholder_name }}" required>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Pincode</label>
+                    <input type="text" name="pincode" class="form-control"
+                           value="{{ share.shareholder.pincode }}" required>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Address Line 1</label>
+                    <input type="text" name="address_line1" class="form-control"
+                           value="{{ share.shareholder.address_line1 }}" required>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Address Line 2</label>
+                    <input type="text" name="address_line2" class="form-control"
+                           value="{{ share.shareholder.address_line2 }}">
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">City</label>
+                    <input type="text" name="city" class="form-control"
+                           value="{{ share.shareholder.city }}" required>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">State</label>
+                    <input type="text" name="state" class="form-control"
+                           value="{{ share.shareholder.state }}" required>
+                </div>
+
+                <div class="col-md-12">
+                    <label class="form-label">Documents</label>
+                    <input type="file" name="documents" class="form-control" multiple required>
+                    <small class="text-muted">You can select multiple files.</small>
+                </div>
+
+                <div class="col-md-12">
+                    <label class="form-label">Remarks</label>
+                    <textarea name="remarks" class="form-control" rows="3"></textarea>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary mt-3">Submit Request</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

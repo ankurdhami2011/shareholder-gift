@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="top-welcome">
+    <div class="row align-items-center g-4">
+        <div class="col-lg-8">
+            <span class="badge rounded-pill text-bg-light text-primary px-3 py-2 fw-semibold mb-3">
+                Operations Overview
+            </span>
+            <h2 class="fw-bold mb-2">Staff Dashboard</h2>
+            <p class="mb-0 opacity-75">
+                Monitor request activity, delivery progress, branch performance, and share status from one place.
+            </p>
+        </div>
+        <div class="col-lg-4 text-lg-end">
+            <div class="d-flex flex-wrap justify-content-lg-end gap-2">
+                {% if perm_can_view_requests %}
+                <a href="{% url 'staff-web-request-list' %}" class="btn btn-light">
+                    <i class="bi bi-list-ul me-1"></i>View Requests
+                </a>
+                {% endif %}
+
+                {% if perm_can_create_request %}
+                <a href="{% url 'staff-web-create-request-search' %}" class="btn btn-outline-light">
+                    <i class="bi bi-plus-circle me-1"></i>New Request
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3 col-sm-6">
+        <div class="card card-stat">
+            <div class="card-body">
+                <div class="small-label"><i class="bi bi-clipboard-data me-1"></i>Total Requests</div>
+                <h3 class="metric-value">{{ total_request_count }}</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+        <div class="card card-stat">
+            <div class="card-body">
+                <div class="small-label"><i class="bi bi-hourglass-split me-1"></i>Pending</div>
+                <h3 class="metric-value">{{ pending_count }}</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+        <div class="card card-stat">
+            <div class="card-body">
+                <div class="small-label"><i class="bi bi-check-circle me-1"></i>Accepted</div>
+                <h3 class="metric-value">{{ accepted_count }}</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+        <div class="card card-stat">
+            <div class="card-body">
+                <div class="small-label"><i class="bi bi-x-circle me-1"></i>Rejected</div>
+                <h3 class="metric-value">{{ rejected_count }}</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+        <div class="card card-stat">
+            <div class="card-body">
+                <div class="small-label"><i class="bi bi-truck me-1"></i>Shipped</div>
+                <h3 class="metric-value">{{ shipped_count }}</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+        <div class="card card-stat">
+            <div class="card-body">
+                <div class="small-label"><i class="bi bi-box-seam me-1"></i>Delivered</div>
+                <h3 class="metric-value">{{ delivered_count }}</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+        <div class="card card-stat">
+            <div class="card-body">
+                <div class="small-label"><i class="bi bi-calendar-event me-1"></i>Today Requests</div>
+                <h3 class="metric-value">{{ today_request_count }}</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+        <div class="card card-stat">
+            <div class="card-body">
+                <div class="small-label"><i class="bi bi-calendar-check me-1"></i>Today Delivered</div>
+                <h3 class="metric-value">{{ today_delivered_count }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="small-label"><i class="bi bi-diagram-3 me-1"></i>Total Shares</div>
+                <h3 class="metric-value">{{ total_share_count }}</h3>
+                <p class="section-subtitle mt-2">All shares currently available in the system.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="small-label"><i class="bi bi-check2-square me-1"></i>Eligible Shares</div>
+                <h3 class="metric-value text-success">{{ eligible_share_count }}</h3>
+                <p class="section-subtitle mt-2">Shares available for request processing.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="small-label"><i class="bi bi-slash-circle me-1"></i>Stopped Shares</div>
+                <h3 class="metric-value text-danger">{{ stopped_share_count }}</h3>
+                <p class="section-subtitle mt-2">Shares marked as unavailable or stopped.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card chart-card">
+            <div class="card-header">Daily Request Trend (Last 7 Days)</div>
+            <div class="card-body" style="height: 320px;">
+                <canvas id="requestChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card chart-card">
+            <div class="card-header">Daily Delivered Trend</div>
+            <div class="card-body" style="height: 320px;">
+                <canvas id="deliveredChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card chart-card">
+            <div class="card-header">Branch-wise Requests</div>
+            <div class="card-body" style="height: 320px;">
+                <canvas id="branchChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card chart-card">
+            <div class="card-header">Share Status Distribution</div>
+            <div class="card-body" style="height: 320px;">
+                <canvas id="shareChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h5 class="section-title">Recent Requests</h5>
+            <p class="section-subtitle">Latest gift requests submitted in the system.</p>
+        </div>
+        {% if perm_can_view_requests %}
+        <a href="{% url 'staff-web-request-list' %}" class="btn btn-outline-primary btn-sm">View all</a>
+        {% endif %}
+    </div>
+
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Request No</th>
+                        <th>Shareholder</th>
+                        <th>Share No</th>
+                        <th>Branch</th>
+                        <th>Status</th>
+                        <th>Submitted</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in recent_requests %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'staff-web-request-detail' item.id %}" class="fw-semibold text-primary">
+                                {{ item.request_no|default:"-" }}
+                            </a>
+                        </td>
+                        <td>{{ item.shareholder.shareholder_name }}</td>
+                        <td>{{ item.share.share_number }}</td>
+                        <td>{{ item.branch.branch_name }}</td>
+                        <td><span class="badge-soft">{{ item.request_status }}</span></td>
+                        <td>{{ item.submitted_at }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">No recent requests found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    createLineChart(
+        'requestChart',
+        'requestChartInstance',
+        {{ request_dates|safe }},
+        {{ request_counts|safe }},
+        'Requests'
+    );
+
+    createLineChart(
+        'deliveredChart',
+        'deliveredChartInstance',
+        {{ delivered_dates|safe }},
+        {{ delivered_counts|safe }},
+        'Delivered'
+    );
+
+    createBarChart(
+        'branchChart',
+        'branchChartInstance',
+        {{ branch_labels|safe }},
+        {{ branch_counts|safe }},
+        'Requests'
+    );
+
+    const shareCanvas = document.getElementById('shareChart');
+    if (shareCanvas) {
+        destroyChartIfExists('shareChartInstance');
+        const shareCtx = shareCanvas.getContext('2d');
+
+        window.dashboardCharts['shareChartInstance'] = new Chart(shareCtx, {
+            type: 'doughnut',
+            data: {
+                labels: {{ share_status_labels|safe }},
+                datasets: [{
+                    data: {{ share_status_counts|safe }},
+                    backgroundColor: [
+                        'rgba(11, 92, 171, 0.88)',
+                        'rgba(25, 167, 255, 0.85)',
+                        'rgba(34, 197, 94, 0.85)',
+                        'rgba(239, 68, 68, 0.85)',
+                        'rgba(245, 158, 11, 0.85)'
+                    ],
+                    borderColor: '#ffffff',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}

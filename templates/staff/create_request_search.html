@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% block title %}Staff Create Request{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Staff Create Request</h2>
+</div>
+
+<form method="get" class="mb-3">
+    <div class="row g-2">
+        <div class="col-md-5">
+            <input type="text" name="search" value="{{ search }}" class="form-control"
+                   placeholder="Search by Share No / Folio / Name / Mobile">
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+    </div>
+</form>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Share No</th>
+                        <th>Folio</th>
+                        <th>Name</th>
+                        <th>Mobile</th>
+                        <th>Branch</th>
+                        <th>Share Status</th>
+                        <th>Last Request Status</th>
+                        <th>Rejection Reason</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>{{ item.share_number }}</td>
+                        <td>{{ item.shareholder_code }}</td>
+                        <td>{{ item.shareholder_name }}</td>
+                        <td>{{ item.mobile_number }}</td>
+                        <td>{{ item.branch_name }}</td>
+
+                        <td>
+                            {% if item.gift_status == 'ELIGIBLE' %}
+                                <span class="badge bg-success">ELIGIBLE</span>
+                            {% else %}
+                                <span class="badge bg-danger">STOPPED</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if item.last_request_status %}
+                                {% if item.last_request_status == 'REJECTED' %}
+                                    <span class="badge bg-danger">REJECTED</span>
+                                {% elif item.last_request_status == 'DELIVERED' %}
+                                    <span class="badge bg-success">DELIVERED</span>
+                                {% elif item.last_request_status == 'PENDING' %}
+                                    <span class="badge bg-warning text-dark">PENDING</span>
+                                {% elif item.last_request_status == 'ACCEPTED' %}
+                                    <span class="badge bg-info text-dark">ACCEPTED</span>
+                                {% elif item.last_request_status == 'SHIPPED' %}
+                                    <span class="badge bg-primary">SHIPPED</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ item.last_request_status }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge bg-light text-dark">NO REQUEST</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {{ item.last_rejection_reason|default:"-" }}
+                        </td>
+
+                        <td>
+                            {% if item.gift_status != 'ELIGIBLE' %}
+                                <button class="btn btn-sm btn-secondary" disabled>Stopped</button>
+                            {% elif item.has_blocking_request %}
+                                <button class="btn btn-sm btn-secondary" disabled>Already Requested</button>
+                            {% else %}
+                                <a href="{% url 'staff-web-create-request-form' item.id %}" class="btn btn-sm btn-primary">
+                                    Select
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center">No data found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

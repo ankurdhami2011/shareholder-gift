@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+{% block title %}Reports{% endblock %}
+
+{% block content %}
+<h2 class="mb-3">Reports</h2>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-2">
+                <label class="form-label">From Date</label>
+                <input type="date" name="from_date" value="{{ from_date }}" class="form-control">
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">To Date</label>
+                <input type="date" name="to_date" value="{{ to_date }}" class="form-control">
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">Branch</label>
+                <select name="branch_id" class="form-select">
+                    <option value="">All Branches</option>
+                    {% for branch in branch_queryset %}
+                        <option value="{{ branch.id }}" {% if branch_id == branch.id|stringformat:"s" %}selected{% endif %}>
+                            {{ branch.branch_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select">
+                    {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">Request No</label>
+                <input type="text" name="request_no" value="{{ request_no }}" class="form-control" placeholder="Search request no">
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">Rows</label>
+                <select name="per_page" class="form-select">
+                    <option value="10" {% if per_page == '10' %}selected{% endif %}>10</option>
+                    <option value="20" {% if per_page == '20' %}selected{% endif %}>20</option>
+                </select>
+            </div>
+
+            <div class="col-md-12 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">Filter</button>
+
+                <a href="{% url 'staff-web-report-summary' %}" class="btn btn-secondary me-2">Reset</a>
+
+                <a href="{% url 'staff-web-report-export-excel' %}?from_date={{ from_date }}&to_date={{ to_date }}&branch_id={{ branch_id }}&status={{ status_filter }}&request_no={{ request_no }}"
+                   class="btn btn-success">
+                    Export Excel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-md-2">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <strong>Inserted</strong><br>{{ status_summary.inserted }}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-2">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <strong>Accepted</strong><br>{{ status_summary.accepted }}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-2">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <strong>Rejected</strong><br>{{ status_summary.rejected }}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-2">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <strong>Shipped</strong><br>{{ status_summary.shipped }}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-2">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <strong>Delivered</strong><br>{{ status_summary.delivered }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header">Branch-wise Summary</div>
+    <div class="table-responsive">
+        <table class="table table-bordered mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>Branch</th>
+                    <th>Inserted</th>
+                    <th>Accepted</th>
+                    <th>Rejected</th>
+                    <th>Shipped</th>
+                    <th>Delivered</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in branch_summary %}
+                <tr>
+                    <td>{{ row.branch__branch_name }}</td>
+                    <td>{{ row.inserted }}</td>
+                    <td>{{ row.accepted }}</td>
+                    <td>{{ row.rejected }}</td>
+                    <td>{{ row.shipped }}</td>
+                    <td>{{ row.delivered }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center">No records found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header">Detail Report</div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Request No</th>
+                        <th>Date</th>
+                        <th>Branch</th>
+                        <th>Shareholder</th>
+                        <th>Folio No</th>
+                        <th>Gift Item</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in details %}
+                    <tr>
+                        <td>{{ row.id }}</td>
+                        <td>{{ row.request_no }}</td>
+                        <td>{{ row.submitted_at|date:"d-m-Y" }}</td>
+                        <td>{{ row.branch.branch_name }}</td>
+                        <td>{{ row.shareholder.shareholder_name|default:row.shareholder }}</td>
+                        <td>{{ row.shareholder.folio_no|default:"-" }}</td>
+                        <td>{{ row.gift_cycle.gift_name|default:row.gift_cycle }}</td>
+                        <td>{{ row.request_status }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center">No records found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% if details.has_other_pages %}
+<nav class="mt-3">
+    <ul class="pagination">
+        {% if details.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ details.previous_page_number }}&from_date={{ from_date }}&to_date={{ to_date }}&branch_id={{ branch_id }}&status={{ status_filter }}&request_no={{ request_no }}&per_page={{ per_page }}">Previous</a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">Previous</span>
+            </li>
+        {% endif %}
+
+        {% for num in details.paginator.page_range %}
+            {% if details.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+            {% else %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}&from_date={{ from_date }}&to_date={{ to_date }}&branch_id={{ branch_id }}&status={{ status_filter }}&request_no={{ request_no }}&per_page={{ per_page }}">{{ num }}</a>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        {% if details.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ details.next_page_number }}&from_date={{ from_date }}&to_date={{ to_date }}&branch_id={{ branch_id }}&status={{ status_filter }}&request_no={{ request_no }}&per_page={{ per_page }}">Next</a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">Next</span>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% endblock %}

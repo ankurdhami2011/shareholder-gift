@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Gift Requests{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Gift Requests</h2>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Request No</label>
+                <input type="text" name="request_no" value="{{ request_no }}" class="form-control">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select">
+                    <option value="">All Status</option>
+                    <option value="PENDING" {% if status_filter == 'PENDING' %}selected{% endif %}>PENDING</option>
+                    <option value="ACCEPTED" {% if status_filter == 'ACCEPTED' %}selected{% endif %}>ACCEPTED</option>
+                    <option value="REJECTED" {% if status_filter == 'REJECTED' %}selected{% endif %}>REJECTED</option>
+                    <option value="SHIPPED" {% if status_filter == 'SHIPPED' %}selected{% endif %}>SHIPPED</option>
+                    <option value="DELIVERED" {% if status_filter == 'DELIVERED' %}selected{% endif %}>DELIVERED</option>
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">Search</button>
+                <a href="{% url 'staff-web-request-list' %}" class="btn btn-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>Request No</th>
+                    <th>Shareholder</th>
+                    <th>Share</th>
+                    <th>Branch</th>
+                    <th>Status</th>
+                    <th>Submitted</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for item in items %}
+                <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.request_no }}</td>
+                    <td>{{ item.shareholder.shareholder_name }}</td>
+                    <td>{{ item.share.share_number }}</td>
+                    <td>{{ item.branch.branch_name }}</td>
+                    <td>{{ item.request_status }}</td>
+                    <td>{{ item.submitted_at }}</td>
+                    <td>
+                        <a href="{% url 'staff-web-request-detail' item.id %}" class="btn btn-sm btn-outline-primary">View</a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center">No records found.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

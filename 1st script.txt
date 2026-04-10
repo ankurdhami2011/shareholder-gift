@@ -1,0 +1,569 @@
+-- =========================================================
+-- Shareholder Gift Management System
+-- Full PostgreSQL SQL Script
+-- =========================================================
+
+-- Recommended:
+-- Run in a new database.
+-- PostgreSQL version: 13+ preferred
+
+BEGIN;
+
+-- =========================================================
+-- 1. COMMON FUNCTION: updated_at trigger
+-- =========================================================
+
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+   NEW.updated_at = NOW();
+   RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =========================================================
+-- 2. MASTER TABLES
+-- =========================================================
+
+CREATE TABLE branches (
+    id BIGSERIAL PRIMARY KEY,
+    branch_code VARCHAR(50) NOT NULL UNIQUE,
+    branch_name VARCHAR(150) NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE gift_cycles (
+    id BIGSERIAL PRIMARY KEY,
+    cycle_code VARCHAR(50) NOT NULL UNIQUE,
+    cycle_name VARCHAR(150) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_gift_cycles_dates CHECK (end_date >= start_date)
+);
+
+CREATE TABLE sms_templates (
+    id BIGSERIAL PRIMARY KEY,
+    template_code VARCHAR(100) NOT NULL UNIQUE,
+    template_name VARCHAR(150) NOT NULL,
+    message_body TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- =========================================================
+-- 3. SHAREHOLDER TABLES
+-- =========================================================
+
+CREATE TABLE shareholders (
+    id BIGSERIAL PRIMARY KEY,
+    shareholder_code VARCHAR(100) NOT NULL UNIQUE,
+    shareholder_name VARCHAR(200) NOT NULL,
+    mobile_number VARCHAR(20) NOT NULL,
+    email VARCHAR(200),
+    address_line1 VARCHAR(255),
+    address_line2 VARCHAR(255),
+    city VARCHAR(120),
+    state VARCHAR(120),
+    pincode VARCHAR(20),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE shares (
+    id BIGSERIAL PRIMARY KEY,
+    shareholder_id BIGINT NOT NULL,
+    share_number VARCHAR(100) NOT NULL UNIQUE,
+    certificate_number VARCHAR(100),
+    branch_id BIGINT NOT NULL,
+    gift_status VARCHAR(20) NOT NULL DEFAULT 'ELIGIBLE',
+    stop_reason TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_shares_shareholder
+        FOREIGN KEY (shareholder_id) REFERENCES shareholders(id),
+
+    CONSTRAINT fk_shares_branch
+        FOREIGN KEY (branch_id) REFERENCES branches(id),
+
+    CONSTRAINT chk_shares_gift_status
+        CHECK (gift_status IN ('ELIGIBLE', 'STOPPED')),
+
+    CONSTRAINT chk_shares_stop_reason
+        CHECK (
+            (gift_status = 'STOPPED' AND stop_reason IS NOT NULL)
+            OR
+            (gift_status = 'ELIGIBLE')
+        )
+);
+
+CREATE TABLE shareholder_otp_logs (
+    id BIGSERIAL PRIMARY KEY,
+    mobile_number VARCHAR(20) NOT NULL,
+    otp_code VARCHAR(20) NOT NULL,
+    purpose VARCHAR(50) NOT NULL DEFAULT 'LOGIN',
+    is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    sent_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMP NOT NULL,
+    verified_at TIMESTAMP,
+    ip_address VARCHAR(100),
+    user_agent TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT chk_shareholder_otp_logs_purpose
+        CHECK (purpose IN ('LOGIN'))
+);
+
+-- =========================================================
+-- 4. STAFF TABLES
+-- =========================================================
+
+CREATE TABLE staff_users (
+    id BIGSERIAL PRIMARY KEY,
+    staff_code VARCHAR(100) NOT NULL UNIQUE,
+    full_name VARCHAR(200) NOT NULL,
+    mobile_number VARCHAR(20),
+    email VARCHAR(200),
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role_type VARCHAR(30) NOT NULL,
+    has_all_branch_access BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    last_login_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT chk_staff_users_role_type
+        CHECK (role_type IN ('BRANCH_STAFF', 'MULTI_BRANCH_STAFF', 'MASTER_STAFF', 'ADMIN'))
+);
+
+CREATE TABLE staff_branch_access (
+    id BIGSERIAL PRIMARY KEY,
+    staff_user_id BIGINT NOT NULL,
+    branch_id BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_staff_branch_access_staff
+        FOREIGN KEY (staff_user_id) REFERENCES staff_users(id) ON DELETE CASCADE,
+
+    CONSTRAINT fk_staff_branch_access_branch
+        FOREIGN KEY (branch_id) REFERENCES branches(id),
+
+    CONSTRAINT uq_staff_branch_access UNIQUE (staff_user_id, branch_id)
+);
+
+CREATE TABLE staff_login_logs (
+    id BIGSERIAL PRIMARY KEY,
+    staff_user_id BIGINT NOT NULL,
+    login_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    logout_at TIMESTAMP,
+    ip_address VARCHAR(100),
+    user_agent TEXT,
+    is_success BOOLEAN NOT NULL DEFAULT TRUE,
+
+    CONSTRAINT fk_staff_login_logs_staff_user
+        FOREIGN KEY (staff_user_id) REFERENCES staff_users(id) ON DELETE CASCADE
+);
+
+-- =========================================================
+-- 5. GIFT REQUEST TABLES
+-- =========================================================
+
+CREATE TABLE gift_requests (
+    id BIGSERIAL PRIMARY KEY,
+    request_no VARCHAR(100) NOT NULL UNIQUE,
+
+    shareholder_id BIGINT NOT NULL,
+    share_id BIGINT NOT NULL,
+    gift_cycle_id BIGINT NOT NULL,
+    branch_id BIGINT NOT NULL,
+
+    mobile_number VARCHAR(20) NOT NULL,
+
+    request_status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    rejection_reason TEXT,
+
+    courier_name VARCHAR(150),
+    tracking_number VARCHAR(150),
+
+    acknowledgement_file_path TEXT,
+
+    submitted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    accepted_at TIMESTAMP,
+    rejected_at TIMESTAMP,
+    shipped_at TIMESTAMP,
+    delivered_at TIMESTAMP,
+
+    created_by_type VARCHAR(20) NOT NULL DEFAULT 'SHAREHOLDER',
+    created_by_id BIGINT,
+    updated_by_type VARCHAR(20),
+    updated_by_id BIGINT,
+
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_gift_requests_shareholder
+        FOREIGN KEY (shareholder_id) REFERENCES shareholders(id),
+
+    CONSTRAINT fk_gift_requests_share
+        FOREIGN KEY (share_id) REFERENCES shares(id),
+
+    CONSTRAINT fk_gift_requests_gift_cycle
+        FOREIGN KEY (gift_cycle_id) REFERENCES gift_cycles(id),
+
+    CONSTRAINT fk_gift_requests_branch
+        FOREIGN KEY (branch_id) REFERENCES branches(id),
+
+    CONSTRAINT chk_gift_requests_status
+        CHECK (request_status IN ('PENDING', 'ACCEPTED', 'REJECTED', 'SHIPPED', 'DELIVERED')),
+
+    CONSTRAINT chk_gift_requests_created_by_type
+        CHECK (created_by_type IN ('SHAREHOLDER', 'STAFF', 'ADMIN', 'SYSTEM')),
+
+    CONSTRAINT chk_gift_requests_updated_by_type
+        CHECK (updated_by_type IS NULL OR updated_by_type IN ('SHAREHOLDER', 'STAFF', 'ADMIN', 'SYSTEM')),
+
+    CONSTRAINT chk_gift_requests_rejection_reason
+        CHECK (
+            (request_status = 'REJECTED' AND rejection_reason IS NOT NULL)
+            OR
+            (request_status IN ('PENDING', 'ACCEPTED', 'SHIPPED', 'DELIVERED'))
+        ),
+
+    CONSTRAINT chk_gift_requests_tracking_on_shipped
+        CHECK (
+            (request_status <> 'SHIPPED')
+            OR
+            (request_status = 'SHIPPED' AND tracking_number IS NOT NULL AND courier_name IS NOT NULL)
+        ),
+
+    CONSTRAINT chk_gift_requests_delivered_after_submission
+        CHECK (
+            delivered_at IS NULL OR delivered_at >= submitted_at
+        ),
+
+    CONSTRAINT chk_gift_requests_accepted_after_submission
+        CHECK (
+            accepted_at IS NULL OR accepted_at >= submitted_at
+        ),
+
+    CONSTRAINT chk_gift_requests_rejected_after_submission
+        CHECK (
+            rejected_at IS NULL OR rejected_at >= submitted_at
+        ),
+
+    CONSTRAINT chk_gift_requests_shipped_after_submission
+        CHECK (
+            shipped_at IS NULL OR shipped_at >= submitted_at
+        )
+);
+
+CREATE TABLE request_delivery_addresses (
+    id BIGSERIAL PRIMARY KEY,
+    gift_request_id BIGINT NOT NULL UNIQUE,
+    recipient_name VARCHAR(200),
+    mobile_number VARCHAR(20),
+    address_line1 VARCHAR(255) NOT NULL,
+    address_line2 VARCHAR(255),
+    city VARCHAR(120) NOT NULL,
+    state VARCHAR(120) NOT NULL,
+    pincode VARCHAR(20) NOT NULL,
+    is_from_master_address BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_request_delivery_addresses_gift_request
+        FOREIGN KEY (gift_request_id) REFERENCES gift_requests(id) ON DELETE CASCADE
+);
+
+CREATE TABLE gift_request_documents (
+    id BIGSERIAL PRIMARY KEY,
+    gift_request_id BIGINT NOT NULL,
+    document_type VARCHAR(50) NOT NULL,
+    original_file_name VARCHAR(255) NOT NULL,
+    stored_file_name VARCHAR(255) NOT NULL,
+    file_path TEXT NOT NULL,
+    mime_type VARCHAR(100),
+    file_size BIGINT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_gift_request_documents_gift_request
+        FOREIGN KEY (gift_request_id) REFERENCES gift_requests(id) ON DELETE CASCADE,
+
+    CONSTRAINT chk_gift_request_documents_type
+        CHECK (document_type IN ('SHARE_CERTIFICATE'))
+);
+
+CREATE TABLE gift_request_status_history (
+    id BIGSERIAL PRIMARY KEY,
+    gift_request_id BIGINT NOT NULL,
+    old_status VARCHAR(20),
+    new_status VARCHAR(20) NOT NULL,
+    changed_by_type VARCHAR(20) NOT NULL,
+    changed_by_id BIGINT,
+    remarks TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_gift_request_status_history_request
+        FOREIGN KEY (gift_request_id) REFERENCES gift_requests(id) ON DELETE CASCADE,
+
+    CONSTRAINT chk_gift_request_status_history_old_status
+        CHECK (old_status IS NULL OR old_status IN ('PENDING', 'ACCEPTED', 'REJECTED', 'SHIPPED', 'DELIVERED')),
+
+    CONSTRAINT chk_gift_request_status_history_new_status
+        CHECK (new_status IN ('PENDING', 'ACCEPTED', 'REJECTED', 'SHIPPED', 'DELIVERED')),
+
+    CONSTRAINT chk_gift_request_status_history_changed_by_type
+        CHECK (changed_by_type IN ('SHAREHOLDER', 'STAFF', 'ADMIN', 'SYSTEM'))
+);
+
+CREATE TABLE share_gift_status_history (
+    id BIGSERIAL PRIMARY KEY,
+    share_id BIGINT NOT NULL,
+    old_gift_status VARCHAR(20),
+    new_gift_status VARCHAR(20) NOT NULL,
+    old_stop_reason TEXT,
+    new_stop_reason TEXT,
+    changed_by_type VARCHAR(20) NOT NULL,
+    changed_by_id BIGINT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_share_gift_status_history_share
+        FOREIGN KEY (share_id) REFERENCES shares(id) ON DELETE CASCADE,
+
+    CONSTRAINT chk_share_gift_status_history_old_status
+        CHECK (old_gift_status IS NULL OR old_gift_status IN ('ELIGIBLE', 'STOPPED')),
+
+    CONSTRAINT chk_share_gift_status_history_new_status
+        CHECK (new_gift_status IN ('ELIGIBLE', 'STOPPED')),
+
+    CONSTRAINT chk_share_gift_status_history_changed_by_type
+        CHECK (changed_by_type IN ('STAFF', 'ADMIN', 'SYSTEM'))
+);
+
+-- =========================================================
+-- 6. SMS LOG TABLE
+-- =========================================================
+
+CREATE TABLE sms_logs (
+    id BIGSERIAL PRIMARY KEY,
+    mobile_number VARCHAR(20) NOT NULL,
+    template_code VARCHAR(100),
+    message_text TEXT NOT NULL,
+    send_status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    provider_response TEXT,
+    reference_type VARCHAR(50),
+    reference_id BIGINT,
+    sent_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT chk_sms_logs_send_status
+        CHECK (send_status IN ('PENDING', 'SENT', 'FAILED'))
+);
+
+-- =========================================================
+-- 7. AUDIT TABLES
+-- =========================================================
+
+CREATE TABLE audit_logs (
+    id BIGSERIAL PRIMARY KEY,
+    module_name VARCHAR(100) NOT NULL,
+    table_name VARCHAR(100) NOT NULL,
+    record_id BIGINT NOT NULL,
+    action_type VARCHAR(30) NOT NULL,
+    changed_by_type VARCHAR(20) NOT NULL,
+    changed_by_id BIGINT,
+    branch_id BIGINT,
+    ip_address VARCHAR(100),
+    user_agent TEXT,
+    remarks TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_audit_logs_branch
+        FOREIGN KEY (branch_id) REFERENCES branches(id),
+
+    CONSTRAINT chk_audit_logs_action_type
+        CHECK (action_type IN (
+            'INSERT',
+            'UPDATE',
+            'DELETE',
+            'LOGIN',
+            'LOGOUT',
+            'OTP_SENT',
+            'OTP_VERIFIED',
+            'SUBMIT_REQUEST',
+            'ACCEPT_REQUEST',
+            'REJECT_REQUEST',
+            'SHIP_REQUEST',
+            'DELIVER_REQUEST',
+            'UPLOAD_DOCUMENT',
+            'DOWNLOAD_ACKNOWLEDGEMENT'
+        )),
+
+    CONSTRAINT chk_audit_logs_changed_by_type
+        CHECK (changed_by_type IN ('SHAREHOLDER', 'STAFF', 'ADMIN', 'SYSTEM'))
+);
+
+CREATE TABLE audit_log_details (
+    id BIGSERIAL PRIMARY KEY,
+    audit_log_id BIGINT NOT NULL,
+    column_name VARCHAR(150) NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fk_audit_log_details_audit_log
+        FOREIGN KEY (audit_log_id) REFERENCES audit_logs(id) ON DELETE CASCADE
+);
+
+-- =========================================================
+-- 8. INDEXES
+-- =========================================================
+
+-- shareholders
+CREATE INDEX idx_shareholders_mobile_number ON shareholders(mobile_number);
+CREATE INDEX idx_shareholders_name ON shareholders(shareholder_name);
+
+-- shares
+CREATE INDEX idx_shares_shareholder_id ON shares(shareholder_id);
+CREATE INDEX idx_shares_branch_id ON shares(branch_id);
+CREATE INDEX idx_shares_gift_status ON shares(gift_status);
+
+-- otp logs
+CREATE INDEX idx_shareholder_otp_logs_mobile_number ON shareholder_otp_logs(mobile_number);
+CREATE INDEX idx_shareholder_otp_logs_sent_at ON shareholder_otp_logs(sent_at);
+
+-- staff
+CREATE INDEX idx_staff_users_username ON staff_users(username);
+CREATE INDEX idx_staff_users_role_type ON staff_users(role_type);
+CREATE INDEX idx_staff_branch_access_staff_user_id ON staff_branch_access(staff_user_id);
+CREATE INDEX idx_staff_branch_access_branch_id ON staff_branch_access(branch_id);
+CREATE INDEX idx_staff_login_logs_staff_user_id ON staff_login_logs(staff_user_id);
+CREATE INDEX idx_staff_login_logs_login_at ON staff_login_logs(login_at);
+
+-- gift_requests
+CREATE INDEX idx_gift_requests_shareholder_id ON gift_requests(shareholder_id);
+CREATE INDEX idx_gift_requests_share_id ON gift_requests(share_id);
+CREATE INDEX idx_gift_requests_gift_cycle_id ON gift_requests(gift_cycle_id);
+CREATE INDEX idx_gift_requests_branch_id ON gift_requests(branch_id);
+CREATE INDEX idx_gift_requests_mobile_number ON gift_requests(mobile_number);
+CREATE INDEX idx_gift_requests_status ON gift_requests(request_status);
+CREATE INDEX idx_gift_requests_submitted_at ON gift_requests(submitted_at);
+CREATE INDEX idx_gift_requests_request_no ON gift_requests(request_no);
+
+-- partial unique index for one active request per share per gift cycle
+CREATE UNIQUE INDEX uq_active_request_per_share_per_cycle
+ON gift_requests (share_id, gift_cycle_id)
+WHERE request_status IN ('PENDING', 'ACCEPTED', 'SHIPPED');
+
+-- delivery/document
+CREATE INDEX idx_gift_request_documents_gift_request_id ON gift_request_documents(gift_request_id);
+
+-- request history
+CREATE INDEX idx_gift_request_status_history_request_id ON gift_request_status_history(gift_request_id);
+CREATE INDEX idx_gift_request_status_history_created_at ON gift_request_status_history(created_at);
+
+-- share history
+CREATE INDEX idx_share_gift_status_history_share_id ON share_gift_status_history(share_id);
+CREATE INDEX idx_share_gift_status_history_created_at ON share_gift_status_history(created_at);
+
+-- sms
+CREATE INDEX idx_sms_logs_mobile_number ON sms_logs(mobile_number);
+CREATE INDEX idx_sms_logs_reference ON sms_logs(reference_type, reference_id);
+CREATE INDEX idx_sms_logs_send_status ON sms_logs(send_status);
+
+-- audit
+CREATE INDEX idx_audit_logs_table_record ON audit_logs(table_name, record_id);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
+CREATE INDEX idx_audit_logs_changed_by ON audit_logs(changed_by_type, changed_by_id);
+CREATE INDEX idx_audit_logs_branch_id ON audit_logs(branch_id);
+CREATE INDEX idx_audit_logs_action_type ON audit_logs(action_type);
+
+CREATE INDEX idx_audit_log_details_audit_log_id ON audit_log_details(audit_log_id);
+CREATE INDEX idx_audit_log_details_column_name ON audit_log_details(column_name);
+
+-- reporting indexes
+CREATE INDEX idx_gift_requests_branch_status_submitted
+ON gift_requests(branch_id, request_status, submitted_at);
+
+CREATE INDEX idx_gift_requests_branch_accepted_at
+ON gift_requests(branch_id, accepted_at);
+
+CREATE INDEX idx_gift_requests_branch_rejected_at
+ON gift_requests(branch_id, rejected_at);
+
+CREATE INDEX idx_gift_requests_branch_shipped_at
+ON gift_requests(branch_id, shipped_at);
+
+CREATE INDEX idx_gift_requests_branch_delivered_at
+ON gift_requests(branch_id, delivered_at);
+
+-- =========================================================
+-- 9. TRIGGERS FOR updated_at
+-- =========================================================
+
+CREATE TRIGGER trg_branches_updated_at
+BEFORE UPDATE ON branches
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_gift_cycles_updated_at
+BEFORE UPDATE ON gift_cycles
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_sms_templates_updated_at
+BEFORE UPDATE ON sms_templates
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_shareholders_updated_at
+BEFORE UPDATE ON shareholders
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_shares_updated_at
+BEFORE UPDATE ON shares
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_staff_users_updated_at
+BEFORE UPDATE ON staff_users
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_gift_requests_updated_at
+BEFORE UPDATE ON gift_requests
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_request_delivery_addresses_updated_at
+BEFORE UPDATE ON request_delivery_addresses
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_sms_logs_updated_at
+BEFORE UPDATE ON sms_logs
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+-- =========================================================
+-- 10. OPTIONAL SEED DATA
+-- =========================================================
+
+INSERT INTO sms_templates (template_code, template_name, message_body) VALUES
+('REQUEST_SUBMITTED', 'Request Submitted', 'Your gift request {request_no} has been submitted successfully.'),
+('REQUEST_ACCEPTED', 'Request Accepted', 'Your gift request {request_no} has been accepted.'),
+('REQUEST_REJECTED', 'Request Rejected', 'Your gift request {request_no} has been rejected. Reason: {reason}'),
+('TRACKING_CREATED', 'Tracking Generated', 'Your gift request {request_no} has been shipped. Tracking No: {tracking_number}.');
+
+COMMIT;

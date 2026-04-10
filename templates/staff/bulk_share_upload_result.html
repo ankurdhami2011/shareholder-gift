@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}Bulk Share Import Result{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Bulk Share Import Result</h2>
+    <a href="{% url 'staff-web-bulk-share-upload' %}" class="btn btn-secondary">Back</a>
+</div>
+
+{% if failed_rows %}
+<div class="mb-3">
+    <a href="{% url 'staff-web-bulk-share-failed-export' %}" class="btn btn-danger">
+        Download Failed Rows Report
+    </a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header">Failed Rows</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Row</th>
+                        <th>Branch ID</th>
+                        <th>Shareholder Code</th>
+                        <th>Name</th>
+                        <th>Mobile</th>
+                        <th>Share No</th>
+                        <th>Certificate No</th>
+                        <th>Gift Status</th>
+                        <th>Stop Reason</th>
+                        <th>Error</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in failed_rows %}
+                    <tr>
+                        <td>{{ row.row_num }}</td>
+                        <td>{{ row.branch_id }}</td>
+                        <td>{{ row.shareholder_code }}</td>
+                        <td>{{ row.shareholder_name }}</td>
+                        <td>{{ row.mobile_number }}</td>
+                        <td>{{ row.share_number }}</td>
+                        <td>{{ row.certificate_number }}</td>
+                        <td>{{ row.gift_status }}</td>
+                        <td>{{ row.stop_reason }}</td>
+                        <td>{{ row.row_errors|join:", " }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-success">
+    All valid rows imported successfully.
+</div>
+{% endif %}
+{% endblock %}
