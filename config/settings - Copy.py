@@ -8,12 +8,10 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+SECRET_KEY = 'django-insecure-ltdx6ef%7j0b06dau$@m2=*c^v(x%v&89wuifjks98xz_2ad1u'
+DEBUG = True
 
-import os
-SECRET_KEY = os.environ.get('ltdx6ef%7j0b06dau$@m2=*c^v(x%v&89wuifjks98xz_2ad1u', 'unsafe-secret-key')
-DEBUG = False
-
-ALLOWED_HOSTS = ["shareholder-gift.onrender.com"]
+ALLOWED_HOSTS = ["*", "192.168.0.170", "127.0.0.1", "localhost"]
 
 INSTALLED_APPS = [
     'corsheaders',
@@ -42,9 +40,6 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # ADD THIS
-
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -73,10 +68,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-import dj_database_url
-
 DATABASES = {
-    'default': dj_database_url.config(default='', conn_max_age=600)
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'GIFT',
+        'USER': 'postgres',
+        'PASSWORD': 'ankur',
+        'HOST': '127.0.0.1',
+        'PORT': '5432',
+    }
 }
 SMS_BASE_URL = "https://sms.soft-techsolutions.com/v3/sms/submit"
 SMS_USER = "RAJCBS"
@@ -121,9 +121,7 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
